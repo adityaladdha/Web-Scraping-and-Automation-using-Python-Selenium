@@ -1,0 +1,56 @@
+import os
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+import time
+import re
+import pandas as pd
+
+website = 'https://www.bookganga.com/eBooks/Books?CID=149&PID=230&SelCatOnly=True'
+os.environ['PATH'] += r"C:/chromedriver-win64"
+
+# options = webdriver.ChromeOptions()
+# options.add_argument('--headless')
+driver = webdriver.Chrome()
+driver.get(website)
+driver.implicitly_wait(3)
+
+while True:
+    try:
+        loadMoreButton = driver.find_elements(By.XPATH, "//div[@onclick='LoadMoreData();']")
+        time.sleep(0)
+        loadMoreButton[0].click()
+        time.sleep(0)
+    except Exception as e:
+        print(e)
+        break
+time.sleep(0)
+
+books = driver.find_elements(By.XPATH, "//div[@class='BookThumbBlock']")
+
+book_list = []
+for book in books:
+    driver.implicitly_wait(0)
+    book_name = book.get_attribute("title")
+    book_detail = book.find_element(By.CLASS_NAME, "BookThumbListBlock")
+    book_link = book_detail.get_attribute("onclick")
+    match = re.search("'(.*)'", book_link)
+    if match:
+        found_url = match.group(1)
+        driver_detail = webdriver.Chrome()
+        driver_detail.get(found_url)
+        driver_detail.implicitly_wait(0)
+        book_detail_page = driver_detail.find_element(By.CLASS_NAME, "BookDetails_Title")
+        book_language = driver_detail.find_element(By.CLASS_NAME, "BookDetails_MoreDetails_color")
+        divMoreDetails = driver_detail.find_element(By.CLASS_NAME, "BookDetails_MoreDetails")
+        divCategory = divMoreDetails.find_element(By.XPATH, "//div[contains(text(), 'Category:')]")
+        divPublication = divMoreDetails.find_element(By.XPATH, "//div[contains(text(), 'Publication:')]")
+        divBinding = divMoreDetails.find_element(By.XPATH, "//div[contains(text(), 'Binding:')]")
+        book_price = book.find_element(By.CLASS_NAME, "BookPrice")
+        book_list.append([book_name, found_url, book_language.text, divCategory.text, divPublication.text, divBinding.text, book_price.text])
+        driver_detail.quit()
+
+driver.quit()
+
+df = pd.DataFrame(book_list, columns=['Book Name', 'Book Detail link', 'Book Language', 'Category', 'Publication', 'Binding', 'Book Price'])
+df.to_excel('BookGanga.xlsx', index=False)
+print("Web scraping completed. The data is saved in 'BookGanga.xlsx'.")
